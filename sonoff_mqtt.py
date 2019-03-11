@@ -16,12 +16,12 @@ from pysonofflan import SonoffSwitch
 from threading import Thread,Condition,Event
 import time
 import logging
+import logging.config
 import traceback
 import argparse
 import datetime
 
 
-logging.basicConfig(level=logging.INFO) 
 
 deviceObjects = {}
 deviceCommands = {}
@@ -57,7 +57,7 @@ async def state_callback(device):
         
         if device.host in deviceCommands:
             command = deviceCommands[device.host]
-            loging.info ("sending command " + command + " to " + device.host)
+            logging.info ("sending command " + command + " to " + device.host)
             if command.upper() == "ON":
                 await device.turn_on()
             else:
@@ -72,14 +72,13 @@ async def state_callback(device):
             device.shutdown_event_loop()
 
         payload = ("ON" if device.is_on else "OFF")
-        loging.debug (topic + " " + payload)        
+        logging.debug (topic + " " + payload)        
         msg_info = mqtt.publish(topic, payload=payload)
         msg_info.wait_for_publish()
         # For reference indicate last time message was received
         mqtt.publish(alive_topic(device.host), datetime.datetime.utcnow().replace(microsecond=0).isoformat())
 
-    loging.debug("callback-end : " + str(device))
-
+    logging.debug("callback-end : " + str(device))
 
 def command_waiting(host):
     return host in deviceCommands
@@ -123,10 +122,18 @@ def mqtt_on_message(client, userdata, message):
 def mqtt_connect(client, userdata, flags, rc):
     logging.info ("connected " + str(client))
 
+
 parser = argparse.ArgumentParser()
 parser.add_argument( "host", nargs='+', help="sonnof host")
 parser.add_argument( "--mqtt", default="mqtt", help="mqtt host")
+parser.add_argument( "--logConfig", help="logConfig")
 args = parser.parse_args()
+
+
+if args.logConfig:
+    logging.config.fileConfig(args.logConfig)
+else:
+    logging.basicConfig(level=logging.INFO) 
 
 mqtt = mqtt.Client(client_id="sonoff_mqtt", clean_session=False)
 mqtt.on_connect = mqtt_connect
